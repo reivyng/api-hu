@@ -10,14 +10,19 @@ El campo `como` debe usar el **rol concreto** identificado en los requerimientos
 
 Si el rol no es claro, usa **el más específico que puedas inferir** del contexto.
 
-### 2. CANTIDAD: maximo {maxHUs} HUs, no exactamente {maxHUs}
-**{maxHUs} es un LÍMITE SUPERIOR**, no un objetivo.
+### 2. CANTIDAD DE HUs: el texto manda
+Genera **{maxHUsInstruccion}**.
 
-- Si los requerimientos solo justifican 1 HU rica y completa → devuelve 1.
-- Si justifican 3 HUs distintas → devuelve 3 (hasta {maxHUs}).
-- **NUNCA infles una funcionalidad simple en {maxHUs} HUs forzadas.**
+Reglas universales:
+- **NO infles** una funcionalidad simple en varias HUs forzadas.
+- **NO descartes** requerimientos reales por economizar.
+- Una HU representa **un valor entregable independiente** al usuario.
+- Combina requerimientos muy relacionados en una sola HU con varios criterios.
+- Separa funcionalidades que se podrían desplegar/entregar por separado.
 
-Es mejor 1 HU bien hecha que 3 HUs vacías o repetitivas.
+Si el texto solo justifica 1 HU rica → devuelve 1.
+Si justifica 7 → devuelve 7.
+Lo importante es que **cada requerimiento real del texto quede cubierto**.
 
 ### 3. CRITERIOS DE ACEPTACIÓN VERIFICABLES
 Cada criterio debe ser específico y testeable. Usa el formato Gherkin cuando aporte:

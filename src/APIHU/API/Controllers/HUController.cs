@@ -81,7 +81,7 @@ public class HUController : ControllerBase
     /// El texto se valida igual que el endpoint JSON: mínimo 20 caracteres, máximo 10.000.
     /// </remarks>
     /// <param name="proyecto">Nombre del proyecto (opcional)</param>
-    /// <param name="maximoHUs">Número MÁXIMO de HUs a generar (1-20). Default: 5. El modelo puede generar menos si juzga que basta.</param>
+    /// <param name="maximoHUs">**OPCIONAL** — Número MÁXIMO de HUs a generar (1-20). Si lo dejas vacío (recomendado) el modelo decide libremente cuántas HUs justifica el texto. Solo úsalo si quieres limitar deliberadamente el output (ej: presupuesto de revisión acotado).</param>
     /// <param name="idioma">Código de idioma. Default: "es"</param>
     /// <param name="versionPrompt">Versión de prompts a usar (v1=clásicos, v2=mejorados con detección de roles). Default: "v2"</param>
     /// <param name="contexto">Contexto extra del proyecto/equipo/roles. Mejora mucho la precisión cuando la transcripción no aclara quién es el actor (ej: "Nicoll es coordinadora de RRHH y gestiona 12 personas")</param>

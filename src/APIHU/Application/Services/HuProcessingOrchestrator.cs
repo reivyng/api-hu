@@ -122,13 +122,22 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
             var etapa3Stopwatch = Stopwatch.StartNew();
             _logger.LogInformation("[{CorrelationId}] ▶ ETAPA 3: GENERACIÓN HU - Iniciando...", correlationId);
 
-            var maxHUs = request.MaximoHUs ?? 5;
+            // Si el usuario no pasa maximoHUs, el modelo decide libremente.
+            // Si lo pasa, se respeta como techo duro.
+            var maxHUsInstruccion = request.MaximoHUs.HasValue
+                ? $"un MÁXIMO de {request.MaximoHUs.Value} HU(s)"
+                : "tantas HUs como el texto justifique (sin límite superior)";
+
+            // Compat con prompts v1 que usan {maxHUs} como número entero.
+            var maxHUsLegacy = request.MaximoHUs?.ToString() ?? "10";
+
             var idioma = request.Idioma ?? "es";
 
             var requerimientosJson = System.Text.Json.JsonSerializer.Serialize(resultado.Estructuracion.Requerimientos ?? new List<Requerimiento>());
 
             var promptHU = _promptService.ObtenerPromptHU(version)
-                .Replace("{maxHUs}", maxHUs.ToString())
+                .Replace("{maxHUsInstruccion}", maxHUsInstruccion)
+                .Replace("{maxHUs}", maxHUsLegacy)
                 .Replace("{idioma}", idioma)
                 .Replace("{requerimientos}", requerimientosJson)
                 .Replace("{texto}", resultado.Limpieza.TextoLimpio ?? string.Empty)
