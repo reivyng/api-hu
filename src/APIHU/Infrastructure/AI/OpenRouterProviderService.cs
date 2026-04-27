@@ -62,10 +62,10 @@ public class OpenRouterOptions
     public int BackoffBaseMs { get; set; } = 500;
 
     /// <summary>
-    /// Timeout de cada request individual en segundos. Mantener moderado (60s)
-    /// para no bloquearnos cuando un modelo free responde lento.
+    /// Timeout de cada request individual en segundos. 120s da margen
+    /// para outputs grandes y sigue siendo razonable.
     /// </summary>
-    public int TimeoutSegundos { get; set; } = 60;
+    public int TimeoutSegundos { get; set; } = 120;
 
     /// <summary>
     /// Identificador de tu app (opcional, mejora tu ranking en OpenRouter). Se envía en HTTP-Referer.
@@ -299,6 +299,10 @@ public class OpenRouterProviderService : IAIProviderService
                 // Modelo retirado / no disponible → tratar como transitorio para caer a fallback
                 throw new OpenRouterTransientException(
                     $"Modelo no encontrado en OpenRouter (404). Probando fallback si existe.");
+            case 413:
+                // Payload too large → max_tokens excede contexto del modelo, caer a fallback
+                throw new OpenRouterTransientException(
+                    $"Payload demasiado grande (413). Probando fallback si existe.");
             default:
                 throw new InvalidOperationException(
                     $"Error no manejado de OpenRouter ({(int)status}): {Truncar(body, 300)}");

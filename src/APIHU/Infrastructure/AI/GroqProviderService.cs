@@ -44,7 +44,7 @@ public class GroqOptions
     public int MaxTokens { get; set; } = 16384;
     public int MaximoReintentos { get; set; } = 1;
     public int BackoffBaseMs { get; set; } = 500;
-    public int TimeoutSegundos { get; set; } = 60;
+    public int TimeoutSegundos { get; set; } = 120;
 }
 
 /// <summary>
@@ -254,6 +254,11 @@ public class GroqProviderService : IAIProviderService
                 // Modelo retirado → tratar como transitorio para caer a fallback
                 throw new GroqTransientException(
                     $"Modelo no encontrado en Groq (404). Probando fallback si existe.");
+            case 413:
+                // Payload Too Large: max_tokens supera el contexto del modelo concreto.
+                // Tratamos como transitorio para que caiga al siguiente modelo (que puede tener mayor contexto).
+                throw new GroqTransientException(
+                    $"Payload demasiado grande para este modelo de Groq (413). max_tokens excede su contexto. Probando fallback si existe.");
             default:
                 throw new InvalidOperationException(
                     $"Error no manejado de Groq ({(int)status}): {Truncar(body, 300)}");

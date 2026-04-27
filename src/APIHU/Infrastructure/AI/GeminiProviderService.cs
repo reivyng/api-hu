@@ -63,10 +63,11 @@ public class GeminiOptions
     public int BackoffBaseMs { get; set; } = 500;
 
     /// <summary>
-    /// Timeout de cada request individual en segundos. Mantener moderado (60s)
-    /// para no bloquearnos cuando un modelo free responde lento.
+    /// Timeout de cada request individual en segundos. 120s da margen
+    /// para que el modelo termine outputs grandes (16k+ tokens) sin cortarse,
+    /// y sigue siendo razonable para que los fallbacks rueden si algo se cuelga.
     /// </summary>
-    public int TimeoutSegundos { get; set; } = 60;
+    public int TimeoutSegundos { get; set; } = 120;
 
     /// <summary>
     /// Solo aplica a modelos Gemini 2.5+. Cantidad de tokens que el modelo puede usar
