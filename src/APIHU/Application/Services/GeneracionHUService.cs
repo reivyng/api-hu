@@ -52,20 +52,29 @@ public class GeneracionHUService : IGeneracionHUService
                 };
             }
 
+            var totalHUs = resultado.HistoriasUsuario?.Count ?? 0;
+            var mensaje = resultado.RespuestaTruncada
+                ? $"Se generaron {totalHUs} HUs (la respuesta del modelo se truncó: probablemente hay más HUs que no se pudieron generar — sube MaxTokens o divide el texto)"
+                : $"Se generaron {totalHUs} historias de usuario exitosamente";
+
             return new GenerarHUResponse
             {
                 Exitoso = true,
-                Mensaje = $"Se generaron {resultado.HistoriasUsuario?.Count ?? 0} historias de usuario exitosamente",
+                Mensaje = mensaje,
                 TextoLimpio = resultado.Limpieza?.TextoLimpio,
                 HistoriasUsuario = resultado.HistoriasUsuario ?? new List<HistoriaUsuarioResponse>(),
                 Metadata = new GenerarHUMetadata
                 {
                     FechaGeneracion = DateTime.UtcNow,
                     Proyecto = request.Proyecto,
-                    TotalHUs = resultado.HistoriasUsuario?.Count ?? 0,
+                    TotalHUs = totalHUs,
                     Idioma = request.Idioma ?? "es",
                     VersionPrompt = request.VersionPrompt ?? "v1",
-                    DuracionMs = (int)(resultado.TiempoTotal?.TotalMilliseconds ?? 0)
+                    DuracionMs = (int)(resultado.TiempoTotal?.TotalMilliseconds ?? 0),
+                    RespuestaTruncada = resultado.RespuestaTruncada,
+                    AdvertenciaTruncamiento = resultado.RespuestaTruncada
+                        ? "El modelo alcanzó MaxTokens. Se rescataron las HUs completas. Si tu texto es muy largo, considera dividirlo o subir Gemini__MaxTokens en .env."
+                        : null
                 },
                 CorrelationId = resultado.CorrelationId
             };

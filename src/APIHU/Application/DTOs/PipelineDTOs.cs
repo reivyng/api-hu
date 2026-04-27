@@ -102,4 +102,12 @@ public class ResultadoPipeline
     /// Suma total de tokens (input + output)
     /// </summary>
     public int TokensTotales => TokensInput + TokensOutput;
+
+    /// <summary>
+    /// Indica si la respuesta del modelo en la etapa de generación se truncó
+    /// (alcanzó MaxTokens) y solo se rescataron las HUs completas que
+    /// alcanzaron a serializarse. Si es true, considera subir el MaxTokens
+    /// del provider o dividir el texto en chunks más pequeños.
+    /// </summary>
+    public bool RespuestaTruncada { get; set; }
 }

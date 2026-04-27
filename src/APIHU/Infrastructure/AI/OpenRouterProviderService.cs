@@ -46,10 +46,9 @@ public class OpenRouterOptions
     public double Temperatura { get; set; } = 0.1;
 
     /// <summary>
-    /// Tokens máximos de respuesta. 8192 cubre cómodamente 10-12 HUs detalladas
-    /// con criterios Gherkin y tareas técnicas.
+    /// Tokens máximos de respuesta. 16384 cubre cómodamente ~25 HUs detalladas.
     /// </summary>
-    public int MaxTokens { get; set; } = 8192;
+    public int MaxTokens { get; set; } = 16384;
 
     /// <summary>
     /// Número máximo de intentos por modelo (1 = un solo intento, sin retry).

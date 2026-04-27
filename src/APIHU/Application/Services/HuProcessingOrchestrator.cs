@@ -145,7 +145,17 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
 
             var respuestaHU = await _aiProvider.EnviarPromptAsync(promptHU, cancellationToken);
             AcumularTokens(resultado, _aiProvider.UltimoUso);
-            resultado.HistoriasUsuario = ParsearHistoriasUsuario(respuestaHU);
+            var (historias, truncado) = ParsearHistoriasUsuario(respuestaHU);
+            resultado.HistoriasUsuario = historias;
+            resultado.RespuestaTruncada = truncado;
+
+            if (truncado)
+            {
+                _logger.LogWarning(
+                    "[{CorrelationId}] ⚠ RESPUESTA TRUNCADA: el modelo alcanzó MaxTokens. " +
+                    "Se rescataron {Count} HUs completas. Considera subir Gemini__MaxTokens o dividir el texto.",
+                    correlationId, historias.Count);
+            }
 
             etapa3Stopwatch.Stop();
             resultado.GeneracionDuracionMs = etapa3Stopwatch.ElapsedMilliseconds;
@@ -349,14 +359,18 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
         }
     }
 
-    private List<HistoriaUsuarioResponse> ParsearHistoriasUsuario(string respuesta)
+    /// <summary>
+    /// Parsea la respuesta del modelo en HUs. Devuelve la lista y un flag indicando
+    /// si tuvo que rescatar de JSON truncado (= la respuesta del modelo excedi\u00f3 MaxTokens).
+    /// </summary>
+    private (List<HistoriaUsuarioResponse> historias, bool truncado) ParsearHistoriasUsuario(string respuesta)
     {
         var opciones = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-        List<HistoriaUsuarioResponse> FallbackTextoPlano(string texto)
+        (List<HistoriaUsuarioResponse>, bool) FallbackTextoPlano(string texto)
         {
             _logger.LogWarning("No se pudieron rescatar HUs estructuradas. Devolviendo HU \u00fanica con texto crudo.");
-            return new List<HistoriaUsuarioResponse>
+            return (new List<HistoriaUsuarioResponse>
             {
                 new HistoriaUsuarioResponse
                 {
@@ -371,7 +385,7 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
                         new TareaTecnicaResponse { Descripcion = "Tareas definidas por el modelo", Tipo = "Desarrollo", Orden = 1 }
                     }
                 }
-            };
+            }, false);
         }
 
         try
@@ -390,7 +404,7 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
                 var wrapper = System.Text.Json.JsonSerializer.Deserialize<HistoriaUsuarioWrapper>(respuesta, opciones);
                 if (wrapper?.HistoriasUsuario != null && wrapper.HistoriasUsuario.Count > 0)
                 {
-                    return wrapper.HistoriasUsuario;
+                    return (wrapper.HistoriasUsuario, false);
                 }
             }
             catch (System.Text.Json.JsonException jex)
@@ -401,15 +415,10 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
             }
 
             // Intento 2: rescate de JSON truncado.
-            // Si el modelo se qued\u00f3 sin tokens a mitad de un objeto, intentamos
-            // recuperar las HUs completas que ya estaban serializadas.
             var rescatado = IntentarRescatarHistoriasParciales(respuesta);
             if (rescatado.Count > 0)
             {
-                _logger.LogWarning(
-                    "JSON truncado: rescatadas {N} HUs completas (probablemente la respuesta excedi\u00f3 MaxTokens)",
-                    rescatado.Count);
-                return rescatado;
+                return (rescatado, true);
             }
 
             return FallbackTextoPlano(respuesta);

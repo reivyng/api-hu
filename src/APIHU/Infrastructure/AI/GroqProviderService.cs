@@ -41,7 +41,7 @@ public class GroqOptions
     public string[] ModelosFallback { get; set; } = Array.Empty<string>();
 
     public double Temperatura { get; set; } = 0.1;
-    public int MaxTokens { get; set; } = 8192;
+    public int MaxTokens { get; set; } = 16384;
     public int MaximoReintentos { get; set; } = 1;
     public int BackoffBaseMs { get; set; } = 500;
     public int TimeoutSegundos { get; set; } = 60;

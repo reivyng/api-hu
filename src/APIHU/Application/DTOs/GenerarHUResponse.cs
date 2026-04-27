@@ -58,11 +58,23 @@ public class GenerarHUMetadata
     public int TotalHUs { get; set; }
     public string? Idioma { get; set; }
     public string? VersionPrompt { get; set; }
-    
+
     /// <summary>
     /// Duración del procesamiento en milisegundos
     /// </summary>
     public int DuracionMs { get; set; }
+
+    /// <summary>
+    /// Si es true, la respuesta del modelo se truncó por alcanzar MaxTokens.
+    /// Solo se devolvieron las HUs completas que alcanzaron a serializarse.
+    /// Considera subir Gemini__MaxTokens (en .env) o dividir el texto.
+    /// </summary>
+    public bool RespuestaTruncada { get; set; }
+
+    /// <summary>
+    /// Aviso textual cuando RespuestaTruncada es true.
+    /// </summary>
+    public string? AdvertenciaTruncamiento { get; set; }
 }
 
 /// <summary>
