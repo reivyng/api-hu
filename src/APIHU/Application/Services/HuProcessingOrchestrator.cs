@@ -351,47 +351,17 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
 
     private List<HistoriaUsuarioResponse> ParsearHistoriasUsuario(string respuesta)
     {
-        try
+        var opciones = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        List<HistoriaUsuarioResponse> FallbackTextoPlano(string texto)
         {
-            respuesta = LimpiarRespuesta(respuesta);
-            
-            // Si la respuesta no empieza con { o [, es texto plano - crear HU desde texto
-            var trimmed = respuesta.Trim();
-            if (!trimmed.StartsWith("{") && !trimmed.StartsWith("["))
-            {
-                _logger.LogWarning("La respuesta no es JSON válido, creando HU desde texto plano");
-                return new List<HistoriaUsuarioResponse>
-                {
-                    new HistoriaUsuarioResponse
-                    {
-                        Titulo = "Historia de Usuario",
-                        Descripcion = respuesta.Length > 1000 ? respuesta.Substring(0, 1000) : respuesta,
-                        CriteriosAceptacion = new List<CriterioAceptacionResponse>
-                        {
-                            new CriterioAceptacionResponse { Descripcion = "Criterios definidos por el modelo", Orden = 1, EsObligatorio = true }
-                        },
-                        TareasTecnicas = new List<TareaTecnicaResponse>
-                        {
-                            new TareaTecnicaResponse { Descripcion = "Tareas definidas por el modelo", Tipo = "Desarrollo", Orden = 1 }
-                        }
-                    }
-                };
-            }
-            
-            var opciones = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            
-            var wrapper = System.Text.Json.JsonSerializer.Deserialize<HistoriaUsuarioWrapper>(respuesta, opciones);
-            return wrapper?.HistoriasUsuario ?? new List<HistoriaUsuarioResponse>();
-        }
-        catch (System.Text.Json.JsonException ex)
-        {
-            _logger.LogWarning(ex, "Error al parsear historias de usuario, creando desde texto plano");
+            _logger.LogWarning("No se pudieron rescatar HUs estructuradas. Devolviendo HU \u00fanica con texto crudo.");
             return new List<HistoriaUsuarioResponse>
             {
                 new HistoriaUsuarioResponse
                 {
                     Titulo = "Historia de Usuario",
-                    Descripcion = respuesta.Length > 1000 ? respuesta.Substring(0, 1000) : respuesta,
+                    Descripcion = texto.Length > 1000 ? texto.Substring(0, 1000) : texto,
                     CriteriosAceptacion = new List<CriterioAceptacionResponse>
                     {
                         new CriterioAceptacionResponse { Descripcion = "Criterios definidos por el modelo", Orden = 1, EsObligatorio = true }
@@ -402,6 +372,119 @@ public class HuProcessingOrchestrator : IHuProcessingOrchestrator
                     }
                 }
             };
+        }
+
+        try
+        {
+            respuesta = LimpiarRespuesta(respuesta);
+
+            var trimmed = respuesta.Trim();
+            if (!trimmed.StartsWith("{") && !trimmed.StartsWith("["))
+            {
+                return FallbackTextoPlano(respuesta);
+            }
+
+            // Intento 1: parseo directo
+            try
+            {
+                var wrapper = System.Text.Json.JsonSerializer.Deserialize<HistoriaUsuarioWrapper>(respuesta, opciones);
+                if (wrapper?.HistoriasUsuario != null && wrapper.HistoriasUsuario.Count > 0)
+                {
+                    return wrapper.HistoriasUsuario;
+                }
+            }
+            catch (System.Text.Json.JsonException jex)
+            {
+                _logger.LogWarning(
+                    "Parse directo fall\u00f3 ({Mensaje}). Intentando rescate de JSON truncado...",
+                    jex.Message);
+            }
+
+            // Intento 2: rescate de JSON truncado.
+            // Si el modelo se qued\u00f3 sin tokens a mitad de un objeto, intentamos
+            // recuperar las HUs completas que ya estaban serializadas.
+            var rescatado = IntentarRescatarHistoriasParciales(respuesta);
+            if (rescatado.Count > 0)
+            {
+                _logger.LogWarning(
+                    "JSON truncado: rescatadas {N} HUs completas (probablemente la respuesta excedi\u00f3 MaxTokens)",
+                    rescatado.Count);
+                return rescatado;
+            }
+
+            return FallbackTextoPlano(respuesta);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error inesperado parseando HUs");
+            return FallbackTextoPlano(respuesta);
+        }
+    }
+
+    /// <summary>
+    /// Cuando el JSON viene truncado a mitad del array historiasUsuario, intenta
+    /// extraer los objetos completos que ya estaban serializados, recortando despu\u00e9s
+    /// del \u00faltimo "}" balanceado y cerrando el array y el wrapper manualmente.
+    /// </summary>
+    private List<HistoriaUsuarioResponse> IntentarRescatarHistoriasParciales(string respuesta)
+    {
+        var opciones = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Localizar el inicio del array historiasUsuario
+        var arrayKeyIdx = respuesta.IndexOf("\"historiasUsuario\"", StringComparison.OrdinalIgnoreCase);
+        if (arrayKeyIdx < 0) return new List<HistoriaUsuarioResponse>();
+
+        var arrayStart = respuesta.IndexOf('[', arrayKeyIdx);
+        if (arrayStart < 0) return new List<HistoriaUsuarioResponse>();
+
+        // Recorrer caracteres llevando cuenta de profundidad de objetos {} dentro del array.
+        // Cada vez que profundidad vuelve a 0 (despu\u00e9s de haber subido), significa
+        // que se cerr\u00f3 un objeto HU completo. Marcamos esa posici\u00f3n.
+        var depth = 0;
+        var insideString = false;
+        var escape = false;
+        var lastCompleteObjectEnd = -1;
+
+        for (var i = arrayStart + 1; i < respuesta.Length; i++)
+        {
+            var c = respuesta[i];
+
+            if (escape) { escape = false; continue; }
+            if (c == '\\') { escape = true; continue; }
+            if (c == '"') { insideString = !insideString; continue; }
+            if (insideString) continue;
+
+            if (c == '{') depth++;
+            else if (c == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    lastCompleteObjectEnd = i;
+                }
+            }
+            else if (c == ']' && depth == 0)
+            {
+                // Array cerr\u00f3 normalmente
+                lastCompleteObjectEnd = i - 1;
+                break;
+            }
+        }
+
+        if (lastCompleteObjectEnd < 0) return new List<HistoriaUsuarioResponse>();
+
+        // Reconstruir JSON v\u00e1lido cortando despu\u00e9s del \u00faltimo objeto completo
+        var prefijo = respuesta.Substring(0, lastCompleteObjectEnd + 1);
+        var jsonRecuperado = prefijo + "]}";
+
+        try
+        {
+            var wrapper = System.Text.Json.JsonSerializer.Deserialize<HistoriaUsuarioWrapper>(jsonRecuperado, opciones);
+            return wrapper?.HistoriasUsuario ?? new List<HistoriaUsuarioResponse>();
+        }
+        catch
+        {
+            return new List<HistoriaUsuarioResponse>();
         }
     }
 
