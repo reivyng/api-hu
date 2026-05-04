@@ -302,9 +302,17 @@ app.MapControllers();
 // ============================================
 // 9. INICIO DE LA APLICACIÓN
 // ============================================
+// NOTA: NO pasar URL a app.Run(). Cuando la app corre dentro de IIS
+// (hostingModel="inprocess"), IIS asigna la URL y la marca read-only.
+// Pasar URL aquí causa "Changing the URL is not supported because
+// Addresses IsReadOnly".
+//
+// En desarrollo local con `dotnet run`, las URLs vienen de:
+//   - Properties/launchSettings.json (applicationUrl)
+//   - O ASPNETCORE_URLS env var
+//   - O urls en appsettings.json
 
 var port = builder.Configuration["PORT"] ?? "5000";
-var urls = $"http://0.0.0.0:{port}";
 
 // Obtener configuración de rate limiting para mostrar
 var rateLimitEnabled = builder.Configuration["RateLimiting:Enabled"] ?? "true";
@@ -316,9 +324,8 @@ Console.WriteLine($"""
     ║  API de Generación de Historias de Usuario v2.0          ║
     ║  Production Ready - Enterprise Grade                     ║
     ║  ========================================================  ║
-    ║  Swagger UI:     http://localhost:{port}/swagger          ║
-    ║  API Endpoint:   http://localhost:{port}/api/hu           ║
-    ║  Health Check:   http://localhost:{port}/api/hu/health    ║
+    ║  (Local dev) Swagger:  http://localhost:{port}/swagger    ║
+    ║  En IIS la URL la define el binding del sitio.            ║
     ║                                                          ║
     ║  ARQUITECTURA:                                          ║
     ║  • Clean Architecture                                     ║
@@ -330,8 +337,7 @@ Console.WriteLine($"""
     ║  • Rate Limiting: {rateLimitEnabled,-5} ({rateLimitMax} req/min)          ║
     ║  • API Key: {apiKeyEnabled,-5}                                     ║
     ║  • Serilog: ✓                                            ║
-    ║  • Background Service: Preparado                         ║
     ╚══════════════════════════════════════════════════════════╝
     """);
 
-app.Run(urls);
+app.Run();
